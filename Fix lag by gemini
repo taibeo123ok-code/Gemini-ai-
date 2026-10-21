@@ -1,0 +1,57 @@
+-- Đặt script này vào StarterPlayerScripts hoặc StarterGui (dạng LocalScript)
+local Players = game:GetService("Players")
+local RunService = Service or game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local localPlayer = Players.LocalPlayer
+
+-- ==========================================
+-- 1. TẠO THANH HIỂN THỊ FPS
+-- ==========================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FPSDisplayGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(0, 120, 0, 40)
+fpsLabel.Position = UDim2.new(0, 10, 0, 10)
+fpsLabel.BackgroundTransparency = 0.4
+fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.SourceSansBold
+fpsLabel.Text = "FPS: 0"
+fpsLabel.Parent = screenGui
+
+local frameCount = 0
+local lastUpdate = tick()
+
+RunService.RenderStepped:Connect(function()
+    frameCount = frameCount + 1
+    local now = tick()
+    if now - lastUpdate >= 1 then
+        fpsLabel.Text = "FPS: " .. tostring(frameCount)
+        frameCount = 0
+        lastUpdate = now
+    end
+end)
+
+-- ==========================================
+-- 2. TỐI ƯU ĐỒ HỌA (GIẢM LAG AN TOÀN)
+-- ==========================================
+-- Tắt bóng đổ toàn cục
+Lighting.GlobalShadows = false
+
+-- Tắt các hiệu ứng hậu kỳ nặng (Blur, Bloom, ColorCorrection, v.v.)
+for _, child in ipairs(Lighting:GetChildren()) do
+    if child:IsA("PostEffect") then
+        child.Enabled = false
+    end
+end
+
+-- Giảm chất lượng hiển thị đồ họa xuống mức tối thiểu cho client
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+print("Đã bật bộ đếm FPS và tối ưu hóa đồ họa thành công!")
