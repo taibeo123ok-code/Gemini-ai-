@@ -1,31 +1,58 @@
--- Đặt script này vào StarterPlayerScripts hoặc StarterGui (dạng LocalScript)
-local Players = game:GetService("Players")
-local RunService = Service or game:GetService("RunService")
+-- LocalScript trong StarterPlayerScripts hoặc StarterGui
+local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 
 -- ==========================================
--- 1. TẠO THANH HIỂN THỊ FPS
+-- 1. TẠO GUI HIỂN THỊ FPS & MENU CHỌN CHẾ ĐỘ
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FPSDisplayGui"
+screenGui.Name = "AntiLagMenu"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
+-- Khung chứa chính
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, 180)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BackgroundTransparency = 0.2
+frame.Parent = screenGui
+
+-- Nhãn FPS
 local fpsLabel = Instance.new("TextLabel")
-fpsLabel.Size = UDim2.new(0, 120, 0, 40)
-fpsLabel.Position = UDim2.new(0, 10, 0, 10)
-fpsLabel.BackgroundTransparency = 0.4
-fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+fpsLabel.Size = UDim2.new(1, 0, 0, 30)
+fpsLabel.Position = UDim2.new(0, 0, 0, 0)
+fpsLabel.BackgroundTransparency = 1
 fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 fpsLabel.TextScaled = true
 fpsLabel.Font = Enum.Font.SourceSansBold
 fpsLabel.Text = "FPS: 0"
-fpsLabel.Parent = screenGui
+fpsLabel.Parent = frame
 
+-- Hàm tạo Nút bấm
+local function createButton(text, posY, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, posY)
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.Text = text
+    btn.Parent = frame
+    return btn
+end
+
+local btnManh = createButton("Fix Lag: MẠNH", 40, Color3.fromRGB(200, 140, 0))
+local btnSieuManh = createButton("Fix Lag: SIÊU MẠNH", 85, Color3.fromRGB(220, 80, 0))
+local btnCucManh = createButton("Fix Lag: CỰC MẠNH", 130, Color3.fromRGB(180, 0, 0))
+
+-- Cập nhật bộ đếm FPS
 local frameCount = 0
 local lastUpdate = tick()
-
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
     local now = tick()
@@ -37,21 +64,72 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==========================================
--- 2. TỐI ƯU ĐỒ HỌA (GIẢM LAG AN TOÀN)
+-- 2. CÁC HÀM XỬ LÝ CHẾ ĐỘ FIX LAG
 -- ==========================================
--- Tắt bóng đổ toàn cục
-Lighting.GlobalShadows = false
 
--- Tắt các hiệu ứng hậu kỳ nặng (Blur, Bloom, ColorCorrection, v.v.)
-for _, child in ipairs(Lighting:GetChildren()) do
-    if child:IsA("PostEffect") then
-        child.Enabled = false
+-- CHẾ ĐỘ 1: MẠNH (Tắt bóng, hiệu ứng hình ảnh, giảm bóng nước)
+local function applyManh()
+    Lighting.GlobalShadows = false
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("PostEffect") then
+            child.Enabled = false
+        end
     end
+    
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 0
+    end
+    print("[Anti-Lag] Đã kích hoạt chế độ: MẠNH")
 end
 
--- Giảm chất lượng hiển thị đồ họa xuống mức tối thiểu cho client
-pcall(function()
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-end)
+-- CHẾ ĐỘ 2: SIÊU MẠNH (Chế độ Mạnh + Xóa sạch Texture/Decal + Chuyển sang SmoothPlastic)
+local function applySieuManh()
+    applyManh() -- Bao gồm các bước của chế độ Mạnh
+    
+    local function cleanPart(obj)
+        if obj:IsA("BasePart") then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj:Destroy()
+        end
+    end
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        cleanPart(obj)
+    end
+    
+    Workspace.DescendantAdded:Connect(cleanPart)
+    print("[Anti-Lag] Đã kích hoạt chế độ: SIÊU MẠNH")
+end
 
-print("Đã bật bộ đếm FPS và tối ưu hóa đồ họa thành công!")
+-- CHẾ ĐỘ 3: CỰC MẠNH (Chế độ Siêu Mạnh + Xóa hiệu ứng hạt Particle/Khói/Lửa/Đèn trang trí)
+local function applyCucManh()
+    applySieuManh() -- Bao gồm các bước của chế độ Siêu Mạnh
+    
+    local function cleanEffects(obj)
+        if obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+            obj:Destroy()
+        elseif obj:IsA("Light") then -- Tắt bớt PointLight, SurfaceLight, SpotLight
+            obj.Enabled = false
+        end
+    end
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        cleanEffects(obj)
+    end
+    
+    Workspace.DescendantAdded:Connect(cleanEffects)
+    print("[Anti-Lag] Đã kích hoạt chế độ: CỰC MẠNH")
+end
+
+-- ==========================================
+-- 3. GÁN SỰ KIỆN NÚT BẤM
+-- ==========================================
+btnManh.MouseButton1Click:Connect(applyManh)
+btnSieuManh.MouseButton1Click:Connect(applySieuManh)
+btnCucManh.MouseButton1Click:Connect(applyCucManh)
