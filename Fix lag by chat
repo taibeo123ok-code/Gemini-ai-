@@ -1,0 +1,222 @@
+
+-- BY TAI BA KHI HUB | FPS BOOST V3
+-- FPS meter + monochrome characters + white map
+-- Toggle and restore | Does not delete map parts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local old = playerGui:FindFirstChild("BYTBK_V3")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "BYTBK_V3"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(270, 300)
+frame.Position = UDim2.new(0.5, -135, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(22, 16, 38)
+frame.Active = true
+frame.Parent = gui
+
+Instance.new("UICorner", frame).CornerRadius =
+    UDim.new(0, 14)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(175, 90, 255)
+stroke.Thickness = 2
+
+local function label(text, y, height)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -16, 0, height)
+    l.Position = UDim2.fromOffset(8, y)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = Color3.fromRGB(220, 190, 255)
+    l.TextScaled = true
+    l.Font = Enum.Font.GothamBold
+    l.Parent = frame
+    return l
+end
+
+label("BY TAI BA KHI HUB V3", 8, 34)
+local fpsLabel = label("FPS: --", 43, 28)
+local status = label("STATUS: NORMAL", 72, 25)
+
+local saved = {}
+local enabled = false
+local whiteMap = false
+local monochrome = false
+local frameCount = 0
+local elapsed = 0
+local fps = 0
+
+local function saveSet(obj, property, value)
+    saved[obj] = saved[obj] or {}
+
+    if saved[obj][property] == nil then
+        saved[obj][property] = obj[property]
+    end
+
+    obj[property] = value
+end
+
+local function setWhite(obj)
+    if obj:IsA("BasePart") then
+        saveSet(obj, "Color", Color3.new(1, 1, 1))
+    end
+end
+
+local function setCharacterMono(character)
+    for _, obj in ipairs(character:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            saveSet(obj, "Color", Color3.fromRGB(65, 65, 65))
+        end
+    end
+end
+
+local function optimize(obj)
+    if obj:IsA("PostEffect") then
+        saveSet(obj, "Enabled", false)
+    elseif obj:IsA("ParticleEmitter")
+        or obj:IsA("Trail")
+        or obj:IsA("Beam") then
+        saveSet(obj, "Enabled", false)
+    elseif obj:IsA("BasePart") then
+        saveSet(obj, "CastShadow", false)
+    elseif obj:IsA("Light") then
+        saveSet(obj, "Shadows", false)
+    end
+end
+
+local function applyAll()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if enabled then optimize(obj) end
+        if whiteMap then setWhite(obj) end
+    end
+
+    if monochrome then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character then
+                setCharacterMono(p.Character)
+            end
+        end
+    end
+end
+
+local function restore()
+    enabled = false
+    whiteMap = false
+    monochrome = false
+
+    for obj, properties in pairs(saved) do
+        if obj.Parent then
+            for property, value in pairs(properties) do
+                pcall(function()
+                    obj[property] = value
+                end)
+            end
+        end
+    end
+
+    saved = {}
+    status.Text = "STATUS: NORMAL"
+end
+
+local function button(text, y, callback)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -24, 0, 36)
+    b.Position = UDim2.fromOffset(12, y)
+    b.BackgroundColor3 = Color3.fromRGB(95, 42, 150)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextScaled = true
+    b.Text = text
+    b.Parent = frame
+
+    Instance.new("UICorner", b).CornerRadius =
+        UDim.new(0, 8)
+
+    b.Activated:Connect(callback)
+    return b
+end
+
+local boostButton = button("FPS BOOST: OFF", 105, function()
+    enabled = not enabled
+
+    if enabled then
+        pcall(function()
+            saveSet(Lighting, "GlobalShadows", false)
+        end)
+    end
+
+    applyAll()
+    boostButton.Text = enabled and "FPS BOOST: ON" or "FPS BOOST: OFF"
+    status.Text = enabled and "STATUS: BOOST ACTIVE" or "STATUS: NORMAL"
+end)
+
+local monoButton = button("CHARACTERS: B&W OFF", 147, function()
+    monochrome = not monochrome
+    applyAll()
+    monoButton.Text = monochrome and
+        "CHARACTERS: B&W ON" or "CHARACTERS: B&W OFF"
+end)
+
+local mapButton = button("WHITE MAP: OFF", 189, function()
+    whiteMap = not whiteMap
+    applyAll()
+    mapButton.Text = whiteMap and "WHITE MAP: ON" or "WHITE MAP: OFF"
+end)
+
+button("RESTORE ALL", 231, function()
+    restore()
+    boostButton.Text = "FPS BOOST: OFF"
+    monoButton.Text = "CHARACTERS: B&W OFF"
+    mapButton.Text = "WHITE MAP: OFF"
+end)
+
+button("CLOSE MENU", 273, function()
+    restore()
+    gui:Destroy()
+end)
+
+-- FPS counter: count rendered frames over each interval.
+local connection
+connection = RunService.RenderStepped:Connect(function(dt)
+    frameCount = frameCount + 1
+    elapsed = elapsed + dt
+
+    if elapsed >= 0.5 then
+        fps = math.floor(frameCount / elapsed + 0.5)
+        fpsLabel.Text = "FPS: " .. fps
+        frameCount = 0
+        elapsed = 0
+    end
+end)
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if enabled or whiteMap then
+        task.defer(function()
+            if not obj.Parent then return end
+            if enabled then pcall(optimize, obj) end
+            if whiteMap then pcall(setWhite, obj) end
+        end)
+    end
+end)
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(character)
+        task.wait(1)
+        if monochrome then
+            setCharacterMono(character)
+        end
+    end)
+end)
